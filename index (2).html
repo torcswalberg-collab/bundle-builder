@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bundle Builder</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a1a; background: #f5f5f3; min-height: 100vh; }
+.app { max-width: 860px; margin: 0 auto; background: #fff; min-height: 100vh; }
+.header { padding: 20px 24px 16px; border-bottom: 1px solid #e5e5e3; }
+.header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+.header p { font-size: 13px; color: #666; margin-top: 3px; }
+.tabs { display: flex; border-bottom: 1px solid #e5e5e3; padding: 0 24px; }
+.tab { font-size: 13px; padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; color: #666; transition: all .15s; }
+.tab.active { color: #1a1a1a; border-bottom-color: #1a1a1a; }
+.tab:hover:not(.active) { color: #1a1a1a; }
+.panel { display: none; padding: 20px 24px; }
+.panel.active { display: block; }
+.upload-zone { border: 1px dashed #ccc; border-radius: 12px; padding: 32px; text-align: center; cursor: pointer; transition: background .15s; }
+.upload-zone:hover { background: #f9f9f7; }
+.upload-zone p { font-size: 13px; color: #666; }
+.upload-zone strong { color: #1a1a1a; font-weight: 500; }
+#file-input { display: none; }
+.context-section { margin-top: 16px; }
+.context-section label { font-size: 12px; color: #666; display: block; margin-bottom: 6px; }
+.context-section textarea { width: 100%; font-size: 13px; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; resize: vertical; min-height: 80px; background: #fff; color: #1a1a1a; font-family: inherit; }
+.file-list { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+.file-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: #f5f5f3; border-radius: 8px; font-size: 13px; }
+.file-item .fname { flex: 1; }
+.file-item .fsize { color: #666; font-size: 12px; }
+.file-remove { cursor: pointer; color: #666; font-size: 16px; line-height: 1; padding: 0 4px; }
+.file-remove:hover { color: #1a1a1a; }
+.dedup-section { margin-top: 20px; }
+.dedup-section h3 { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+.dedup-options { display: flex; flex-direction: column; gap: 8px; }
+.dedup-option { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid #e5e5e3; border-radius: 8px; cursor: pointer; transition: background .15s; }
+.dedup-option:hover { background: #f9f9f7; }
+.dedup-option.selected { border-color: #1a1a1a; background: #f9f9f7; }
+.dedup-option input[type=radio] { margin-top: 2px; flex-shrink: 0; }
+.dedup-option .opt-label { font-size: 13px; font-weight: 500; }
+.dedup-option .opt-desc { font-size: 12px; color: #666; margin-top: 2px; }
+.process-btn { margin-top: 20px; width: 100%; padding: 11px; background: #1a1a1a; color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: opacity .15s; font-family: inherit; }
+.process-btn:hover { opacity: 0.85; }
+.process-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.progress-section { margin-top: 20px; display: none; }
+.progress-bar-outer { height: 4px; background: #e5e5e3; border-radius: 2px; }
+.progress-bar-inner { height: 4px; background: #1a1a1a; border-radius: 2px; transition: width .3s; width: 0; }
+.progress-msg { font-size: 12px; color: #666; margin-top: 6px; }
+.bundle-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.sort-btn { font-size: 12px; padding: 5px 12px; border: 1px solid #ddd; border-radius: 20px; background: transparent; cursor: pointer; color: #666; font-family: inherit; transition: all .15s; }
+.sort-btn.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+.sort-btn:hover:not(.active) { background: #f5f5f3; color: #1a1a1a; }
+.bundle-count { font-size: 12px; color: #666; margin-left: auto; }
+.doc-list { display: flex; flex-direction: column; gap: 10px; }
+.doc-card { border: 1px solid #e5e5e3; border-radius: 12px; overflow: hidden; }
+.doc-card-header { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; cursor: pointer; }
+.doc-card-header:hover { background: #f9f9f7; }
+.doc-num { font-size: 11px; color: #999; min-width: 28px; padding-top: 1px; }
+.doc-meta { flex: 1; }
+.doc-subject { font-size: 14px; font-weight: 500; }
+.doc-from { font-size: 12px; color: #666; margin-top: 2px; }
+.doc-date { font-size: 12px; color: #666; white-space: nowrap; }
+.doc-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; display: inline-block; }
+.badge-theme { background: #e8f0fe; color: #1a56db; }
+.badge-key { background: #e3fcef; color: #057a55; }
+.chevron { font-size: 12px; color: #999; margin-left: 8px; transition: transform .2s; }
+.doc-card.open .chevron { transform: rotate(180deg); }
+.doc-body { display: none; padding: 0 16px 14px; border-top: 1px solid #e5e5e3; }
+.doc-card.open .doc-body { display: block; }
+.doc-body p { font-size: 13px; color: #444; line-height: 1.6; padding-top: 12px; }
+.doc-body .full-text { font-size: 12px; color: #666; margin-top: 10px; padding: 10px; background: #f5f5f3; border-radius: 8px; white-space: pre-wrap; max-height: 200px; overflow-y: auto; line-height: 1.5; }
+.review-section { margin-top: 16px; }
+.removed-list { display: flex; flex-direction: column; gap: 8px; }
+.removed-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid #e5e5e3; border-radius: 8px; font-size: 12px; }
+.removed-item .ri-meta { flex: 1; }
+.removed-item .ri-subject { font-size: 13px; font-weight: 500; }
+.removed-item .ri-reason { color: #666; margin-top: 2px; }
+.restore-btn { font-size: 12px; padding: 4px 10px; border: 1px solid #ddd; border-radius: 6px; background: transparent; cursor: pointer; color: #666; font-family: inherit; white-space: nowrap; }
+.restore-btn:hover { background: #f5f5f3; color: #1a1a1a; }
+.empty-state { text-align: center; padding: 48px 24px; color: #666; font-size: 13px; }
+.error-msg { font-size: 13px; color: #c0392b; padding: 10px 12px; background: #fdf0ed; border-radius: 8px; margin-top: 12px; display: none; }
+.stat-row { display: flex; gap: 10px; margin-bottom: 16px; }
+.stat-card { flex: 1; background: #f5f5f3; border-radius: 8px; padding: 12px 14px; }
+.stat-card .sv { font-size: 22px; font-weight: 600; }
+.stat-card .sl { font-size: 12px; color: #666; margin-top: 2px; }
+.theme-header { font-size: 11px; font-weight: 600; color: #999; padding: 10px 0 4px; text-transform: uppercase; letter-spacing: .5px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>Bundle Builder</h1>
+    <p>Upload emails, add case context, and produce a structured legal bundle</p>
+  </div>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('upload')">1. Upload &amp; configure</div>
+    <div class="tab" onclick="switchTab('bundle')">2. Bundle</div>
+    <div class="tab" onclick="switchTab('review')">3. Dedup review</div>
+  </div>
+
+  <!-- UPLOAD PANEL -->
+  <div class="panel active" id="panel-upload">
+    <div class="upload-zone" onclick="document.getElementById('file-input').click()" id="drop-zone">
+      <p style="font-size:32px;margin-bottom:8px;">&#8679;</p>
+      <p><strong>Drop .eml files here</strong> or click to browse</p>
+      <p style="margin-top:4px;font-size:12px;">Supports .eml email files</p>
+    </div>
+    <input type="file" id="file-input" accept=".eml,.txt" multiple onchange="handleFiles(this.files)">
+    <div class="file-list" id="file-list"></div>
+    <div class="context-section">
+      <label>Case context (optional but recommended)</label>
+      <textarea id="case-context" placeholder="e.g. Employment dispute between John Smith and Acme Ltd. Key issues: alleged unfair dismissal, notice period, garden leave clause. Relevant period: Jan–Sep 2024."></textarea>
+    </div>
+    <div class="dedup-section">
+      <h3>De-duplication mode</h3>
+      <div class="dedup-options">
+        <label class="dedup-option selected">
+          <input type="radio" name="dedup" value="exact" checked>
+          <div>
+            <div class="opt-label">Exact duplicates only</div>
+            <div class="opt-desc">Remove only identical emails. Keeps every reply-all thread as a separate document.</div>
+          </div>
+        </label>
+        <label class="dedup-option">
+          <input type="radio" name="dedup" value="thread">
+          <div>
+            <div class="opt-label">Thread collapse (pragmatic)</div>
+            <div class="opt-desc">Retains only the latest email in each thread. Suppresses earlier messages whose content is fully quoted in a later one.</div>
+          </div>
+        </label>
+        <label class="dedup-option">
+          <input type="radio" name="dedup" value="smart">
+          <div>
+            <div class="opt-label">Smart dedup (AI-assisted)</div>
+            <div class="opt-desc">AI identifies near-duplicate content, forwarded variants, and redundant chains.</div>
+          </div>
+        </label>
+      </div>
+    </div>
+    <div id="error-msg" class="error-msg"></div>
+    <button class="process-btn" id="process-btn" onclick="processBundle()" disabled>Process bundle</button>
+    <div class="progress-section" id="progress-section">
+      <div class="progress-bar-outer"><div class="progress-bar-inner" id="progress-bar"></div></div>
+      <div class="progress-msg" id="progress-msg">Processing...</div>
+    </div>
+  </div>
+
+  <!-- BUNDLE PANEL -->
+  <div class="panel" id="panel-bundle">
+    <div id="bundle-empty" class="empty-state">Process your documents to see the bundle here.</div>
+    <div id="bundle-content" style="display:none">
+      <div class="stat-row">
+        <div class="stat-card"><div class="sv" id="stat-total">0</div><div class="sl">Documents in bundle</div></div>
+        <div class="stat-card"><div class="sv" id="stat-removed">0</div><div class="sl">Duplicates removed</div></div>
+        <div class="stat-card"><div class="sv" id="stat-themes">0</div><div class="sl">Themes identified</div></div>
+      </div>
+      <div class="bundle-controls">
+        <button class="sort-btn active" onclick="sortBundle('chrono')" id="sort-chrono">Chronological</button>
+        <button class="sort-btn" onclick="sortBundle('importance')" id="sort-importance">Most important first</button>
+        <button class="sort-btn" onclick="sortBundle('theme')" id="sort-theme">By theme</button>
+        <span class="bundle-count" id="bundle-count"></span>
+      </div>
+      <div class="doc-list" id="doc-list"></div>
+    </div>
+  </div>
+
+  <!-- REVIEW PANEL -->
+  <div class="panel" id="panel-review">
+    <div id="review-empty" class="empty-state">No duplicates have been removed yet.</div>
+    <div id="review-content" style="display:none">
+      <p style="font-size:13px;color:#666;margin-bottom:14px;">Documents flagged as duplicates. Review and restore any that should remain in the bundle.</p>
+      <div class="removed-list" id="removed-list"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BACKEND_URL = 'https://bundle-builder-production.up.railway.app';
+
+let uploadedFiles = [];
+let bundleDocs = [];
+let removedDocs = [];
+let currentSort = 'chrono';
+
+function switchTab(t) {
+  document.querySelectorAll('.tab').forEach((el,i) => {
+    el.classList.toggle('active', ['upload','bundle','review'][i] === t);
+  });
+  ['upload','bundle','review'].forEach(name => {
+    document.getElementById('panel-'+name).classList.toggle('active', name === t);
+  });
+}
+
+document.querySelectorAll('.dedup-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.dedup-option').forEach(o => o.classList.remove('selected'));
+    opt.classList.add('selected');
+  });
+});
+
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.style.background='#f0f0ee'; });
+dropZone.addEventListener('dragleave', () => { dropZone.style.background=''; });
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.style.background=''; handleFiles(e.dataTransfer.files); });
+
+function handleFiles(files) {
+  for (const f of files) {
+    if (!uploadedFiles.find(x => x.name === f.name)) uploadedFiles.push(f);
+  }
+  renderFileList();
+  document.getElementById('process-btn').disabled = uploadedFiles.length === 0;
+}
+
+function renderFileList() {
+  const el = document.getElementById('file-list');
+  el.innerHTML = uploadedFiles.map((f,i) => `
+    <div class="file-item">
+      <span class="fname">${f.name}</span>
+      <span class="fsize">${(f.size/1024).toFixed(1)} KB</span>
+      <span class="file-remove" onclick="removeFile(${i})">×</span>
+    </div>`).join('');
+}
+
+function removeFile(i) {
+  uploadedFiles.splice(i,1);
+  renderFileList();
+  document.getElementById('process-btn').disabled = uploadedFiles.length === 0;
+}
+
+async function parseEml(file) {
+  const text = await file.text();
+  const lines = text.split(/\r?\n/);
+  const headers = {};
+  let i = 0;
+  while (i < lines.length && lines[i].trim() !== '') {
+    const m = lines[i].match(/^([\w-]+):\s*(.*)/);
+    if (m) {
+      let key = m[1].toLowerCase(), val = m[2];
+      while (i+1 < lines.length && /^\s+/.test(lines[i+1])) { i++; val += ' ' + lines[i].trim(); }
+      headers[key] = val;
+    }
+    i++;
+  }
+  const body = lines.slice(i+1).join('\n').replace(/=\r?\n/g,'').replace(/=[0-9A-Fa-f]{2}/g, m => String.fromCharCode(parseInt(m.slice(1),16))).trim();
+  const plainBody = body.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim().substring(0,2000);
+  return {
+    filename: file.name,
+    subject: headers['subject'] || '(No subject)',
+    from: headers['from'] || '',
+    to: headers['to'] || '',
+    date: headers['date'] ? new Date(headers['date']) : new Date(0),
+    dateStr: headers['date'] || '',
+    body: plainBody
+  };
+}
+
+function setProgress(pct, msg) {
+  document.getElementById('progress-bar').style.width = pct+'%';
+  document.getElementById('progress-msg').textContent = msg;
+}
+
+async function processBundle() {
+  const errEl = document.getElementById('error-msg');
+  errEl.style.display = 'none';
+  if (uploadedFiles.length === 0) return;
+
+  document.getElementById('process-btn').disabled = true;
+  const progSection = document.getElementById('progress-section');
+  progSection.style.display = 'block';
+  setProgress(5, 'Parsing email files...');
+
+  try {
+    const parsedEmails = await Promise.all(uploadedFiles.map(parseEml));
+    setProgress(25, `Parsed ${parsedEmails.length} emails. Sending to AI for analysis...`);
+
+    const dedupMode = document.querySelector('input[name=dedup]:checked').value;
+    const caseContext = document.getElementById('case-context').value;
+
+    const emailSummaries = parsedEmails.map((e,i) => ({
+      index: i,
+      filename: e.filename,
+      subject: e.subject,
+      from: e.from,
+      to: e.to,
+      date: e.dateStr,
+      bodySnippet: e.body.substring(0,500)
+    }));
+
+    const systemPrompt = `You are a legal document analyst for an employment lawyer. Analyse the emails and return ONLY valid JSON with this exact structure (no markdown, no preamble):
+{
+  "documents": [
+    {
+      "index": <number>,
+      "importance": <1-10>,
+      "summary": "<2-3 sentence summary>",
+      "theme": "<one of: Dismissal, Notice/Garden Leave, Grievance, Performance, Pay/Benefits, HR Process, Correspondence, Settlement, Other>",
+      "isDuplicate": <true/false>,
+      "duplicateOf": <index or null>,
+      "duplicateReason": "<reason or null>",
+      "keyFlags": ["<up to 3 flags e.g. Admission, Key date, Disputed fact, Without prejudice>"]
+    }
+  ],
+  "themes": ["<distinct themes present>"],
+  "overallSummary": "<2-3 sentence summary>"
+}
+De-duplication mode: ${dedupMode}
+- exact: only mark as duplicate if essentially identical
+- thread: mark earlier emails whose content is fully quoted in a later one
+- smart: identify near-duplicates, forwarded variants, redundant content`;
+
+    const userMsg = `Case context: ${caseContext || 'Not provided'}\n\nEmails:\n${JSON.stringify(emailSummaries, null, 2)}`;
+
+    setProgress(35, 'AI is analysing your documents...');
+
+    const resp = await fetch(`${BACKEND_URL}/api/analyse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMsg }]
+      })
+    });
+
+    setProgress(75, 'Processing AI analysis...');
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error?.message || 'Server error');
+    }
+
+    const data = await resp.json();
+    const rawText = data.content[0].text;
+    const clean = rawText.replace(/```json\n?|```/g,'').trim();
+    const analysis = JSON.parse(clean);
+
+    setProgress(90, 'Building bundle...');
+
+    bundleDocs = [];
+    removedDocs = [];
+
+    analysis.documents.forEach(doc => {
+      const email = parsedEmails[doc.index];
+      const enriched = { ...email, ...doc };
+      if (doc.isDuplicate && dedupMode !== 'exact') {
+        removedDocs.push(enriched);
+      } else if (doc.isDuplicate && dedupMode === 'exact') {
+        removedDocs.push(enriched);
+      } else {
+        bundleDocs.push(enriched);
+      }
+    });
+
+    document.getElementById('stat-total').textContent = bundleDocs.length;
+    document.getElementById('stat-removed').textContent = removedDocs.length;
+    document.getElementById('stat-themes').textContent = (analysis.themes||[]).length;
+
+    setProgress(100, 'Done!');
+    renderBundle('chrono');
+    renderReview();
+
+    setTimeout(() => {
+      progSection.style.display = 'none';
+      document.getElementById('process-btn').disabled = false;
+      switchTab('bundle');
+    }, 600);
+
+  } catch(err) {
+    errEl.textContent = 'Error: ' + err.message;
+    errEl.style.display = 'block';
+    progSection.style.display = 'none';
+    document.getElementById('process-btn').disabled = false;
+  }
+}
+
+function sortBundle(mode) {
+  currentSort = mode;
+  document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sort-'+mode).classList.add('active');
+  renderBundle(mode);
+}
+
+function renderBundle(mode) {
+  const empty = document.getElementById('bundle-empty');
+  const content = document.getElementById('bundle-content');
+  if (bundleDocs.length === 0) { empty.style.display='block'; content.style.display='none'; return; }
+  empty.style.display='none'; content.style.display='block';
+
+  let sorted = [...bundleDocs];
+  if (mode === 'chrono') sorted.sort((a,b) => a.date - b.date);
+  else if (mode === 'importance') sorted.sort((a,b) => b.importance - a.importance);
+  else if (mode === 'theme') sorted.sort((a,b) => (a.theme||'').localeCompare(b.theme||''));
+
+  document.getElementById('bundle-count').textContent = sorted.length + ' documents';
+
+  let lastTheme = null;
+  document.getElementById('doc-list').innerHTML = sorted.map((doc,idx) => {
+    let themeHeader = '';
+    if (mode === 'theme' && doc.theme !== lastTheme) {
+      lastTheme = doc.theme;
+      themeHeader = `<div class="theme-header">${doc.theme}</div>`;
+    }
+    const dateLabel = doc.date instanceof Date && doc.date.getTime() !== 0
+      ? doc.date.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'})
+      : doc.dateStr || 'Date unknown';
+    const badges = (doc.keyFlags||[]).map(f => `<span class="badge badge-key">${f}</span>`).join('');
+    const themeBadge = doc.theme ? `<span class="badge badge-theme">${doc.theme}</span>` : '';
+    return `${themeHeader}<div class="doc-card" id="card-${idx}">
+      <div class="doc-card-header" onclick="toggleCard(${idx})">
+        <span class="doc-num">${(idx+1).toString().padStart(2,'0')}</span>
+        <div class="doc-meta">
+          <div class="doc-subject">${esc(doc.subject)}</div>
+          <div class="doc-from">${esc(doc.from)}</div>
+          <div class="doc-badges" style="margin-top:5px">${themeBadge}${badges}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span class="doc-date">${dateLabel}</span>
+          ${doc.importance >= 7 ? '<span class="badge badge-key">Imp: '+doc.importance+'/10</span>' : ''}
+        </div>
+        <span class="chevron">&#9662;</span>
+      </div>
+      <div class="doc-body">
+        <p>${esc(doc.summary||'')}</p>
+        ${doc.body ? `<div class="full-text">${esc(doc.body.substring(0,800))}${doc.body.length>800?'...':''}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCard(idx) {
+  document.getElementById('card-'+idx).classList.toggle('open');
+}
+
+function renderReview() {
+  const empty = document.getElementById('review-empty');
+  const content = document.getElementById('review-content');
+  const list = document.getElementById('removed-list');
+  if (removedDocs.length === 0) { empty.style.display='block'; content.style.display='none'; return; }
+  empty.style.display='none'; content.style.display='block';
+  list.innerHTML = removedDocs.map((doc,i) => {
+    const dateLabel = doc.date instanceof Date && doc.date.getTime() !== 0
+      ? doc.date.toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'}) : doc.dateStr || '';
+    return `<div class="removed-item" id="removed-${i}">
+      <div class="ri-meta">
+        <div class="ri-subject">${esc(doc.subject)}</div>
+        <div class="ri-reason">${dateLabel ? dateLabel+' · ' : ''}${esc(doc.duplicateReason||'Flagged as duplicate')}</div>
+      </div>
+      <button class="restore-btn" onclick="restoreDoc(${i})">Restore</button>
+    </div>`;
+  }).join('');
+}
+
+function restoreDoc(i) {
+  bundleDocs.push(removedDocs[i]);
+  removedDocs.splice(i,1);
+  document.getElementById('stat-total').textContent = bundleDocs.length;
+  document.getElementById('stat-removed').textContent = removedDocs.length;
+  renderBundle(currentSort);
+  renderReview();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
